@@ -38,6 +38,11 @@ async function flushAutocomplete(): Promise<void> {
 	await new Promise((resolve) => setImmediate(resolve));
 }
 
+async function waitForAutocomplete(): Promise<void> {
+	await new Promise((resolve) => setTimeout(resolve, 50));
+	await flushAutocomplete();
+}
+
 describe("Editor component", () => {
 	describe("Prompt history navigation", () => {
 		it("does nothing on Up arrow when history is empty", () => {
@@ -2090,6 +2095,142 @@ describe("Editor component", () => {
 	});
 
 	describe("Autocomplete", () => {
+		it("auto-opens and updates provider-declared trigger characters", async () => {
+			const editor = new Editor(createTestTUI(), defaultEditorTheme);
+			let suggestionCalls = 0;
+
+			const mockProvider: AutocompleteProvider = {
+				triggerCharacters: ["$"],
+				getSuggestions: async (lines, _cursorLine, cursorCol) => {
+					suggestionCalls += 1;
+					const text = lines[0] || "";
+					const prefix = text.slice(0, cursorCol);
+					const items = [
+						{ value: "$exec", label: "$exec" },
+						{ value: "$exit", label: "$exit" },
+					];
+					const filtered = items.filter((item) => item.value.startsWith(prefix));
+					if (filtered.length === 0) {
+						return null;
+					}
+					return { items: filtered, prefix };
+				},
+				applyCompletion,
+			};
+
+			editor.setAutocompleteProvider(mockProvider);
+
+			editor.handleInput("$");
+			await waitForAutocomplete();
+			assert.strictEqual(editor.getText(), "$");
+			assert.strictEqual(editor.isShowingAutocomplete(), true);
+			assert.strictEqual(suggestionCalls, 1);
+
+			editor.handleInput("e");
+			await waitForAutocomplete();
+			assert.strictEqual(editor.getText(), "$e");
+			assert.strictEqual(editor.isShowingAutocomplete(), true);
+			assert.strictEqual(suggestionCalls, 2);
+
+			editor.handleInput("x");
+			await waitForAutocomplete();
+			assert.strictEqual(editor.getText(), "$ex");
+			assert.strictEqual(editor.isShowingAutocomplete(), true);
+			assert.strictEqual(suggestionCalls, 3);
+
+			editor.handleInput("e");
+			await waitForAutocomplete();
+			assert.strictEqual(editor.getText(), "$exe");
+			assert.strictEqual(editor.isShowingAutocomplete(), true);
+			assert.strictEqual(suggestionCalls, 4);
+
+			editor.handleInput("c");
+			await waitForAutocomplete();
+			assert.strictEqual(editor.getText(), "$exec");
+			assert.strictEqual(editor.isShowingAutocomplete(), true);
+			assert.strictEqual(suggestionCalls, 5);
+		});
+
+		it("applies provider-declared trigger selections with Enter and Tab", async () => {
+			const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+			const mockProvider: AutocompleteProvider = {
+				triggerCharacters: ["$"],
+				getSuggestions: async (lines, _cursorLine, cursorCol) => {
+					const text = lines[0] || "";
+					const prefix = text.slice(0, cursorCol);
+					const items = [
+						{ value: "$exec", label: "$exec" },
+						{ value: "$exit", label: "$exit" },
+					];
+					const filtered = items.filter((item) => item.value.startsWith(prefix));
+					if (filtered.length === 0) {
+						return null;
+					}
+					return { items: filtered, prefix };
+				},
+				applyCompletion,
+			};
+
+			editor.setAutocompleteProvider(mockProvider);
+
+			editor.handleInput("$");
+			editor.handleInput("e");
+			editor.handleInput("x");
+			await waitForAutocomplete();
+			assert.strictEqual(editor.isShowingAutocomplete(), true);
+
+			// Enter applies the selected suggestion.
+			editor.handleInput("\r");
+			assert.strictEqual(editor.getText(), "$exec");
+			assert.strictEqual(editor.isShowingAutocomplete(), false);
+
+			editor.setText("");
+			editor.handleInput("$");
+			editor.handleInput("e");
+			editor.handleInput("x");
+			await waitForAutocomplete();
+			assert.strictEqual(editor.isShowingAutocomplete(), true);
+
+			// Down selects the second suggestion; Tab applies it.
+			editor.handleInput("\x1b[B");
+			editor.handleInput("\t");
+			assert.strictEqual(editor.getText(), "$exit");
+			assert.strictEqual(editor.isShowingAutocomplete(), false);
+		});
+
+		it("closes provider-declared trigger autocomplete on Escape", async () => {
+			const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+			const mockProvider: AutocompleteProvider = {
+				triggerCharacters: ["$"],
+				getSuggestions: async (lines, _cursorLine, cursorCol) => {
+					const text = lines[0] || "";
+					const prefix = text.slice(0, cursorCol);
+					const items = [
+						{ value: "$exec", label: "$exec" },
+						{ value: "$exit", label: "$exit" },
+					];
+					const filtered = items.filter((item) => item.value.startsWith(prefix));
+					if (filtered.length === 0) {
+						return null;
+					}
+					return { items: filtered, prefix };
+				},
+				applyCompletion,
+			};
+
+			editor.setAutocompleteProvider(mockProvider);
+
+			editor.handleInput("$");
+			await waitForAutocomplete();
+			assert.strictEqual(editor.isShowingAutocomplete(), true);
+
+			editor.handleInput("\x1b");
+			assert.strictEqual(editor.getText(), "$");
+			assert.strictEqual(editor.isShowingAutocomplete(), false);
+		});
+
 		it("auto-applies single force-file suggestion without showing menu", async () => {
 			const editor = new Editor(createTestTUI(), defaultEditorTheme);
 
