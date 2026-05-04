@@ -9,6 +9,10 @@ import { SelectList, type SelectListLayoutOptions, type SelectListTheme } from "
 
 const baseSegmenter = getSegmenter();
 
+function escapeRegex(value: string): string {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /** Regex matching paste markers like `[paste #1 +123 lines]` or `[paste #2 1234 chars]`. */
 const PASTE_MARKER_REGEX = /\[paste #(\d+)( (\+\d+ lines|\d+ chars))?\]/g;
 
@@ -212,7 +216,7 @@ const SLASH_COMMAND_SELECT_LIST_LAYOUT: SelectListLayoutOptions = {
 	maxPrimaryColumnWidth: 32,
 };
 
-const ATTACHMENT_AUTOCOMPLETE_DEBOUNCE_MS = 20;
+const NATURAL_AUTOCOMPLETE_DEBOUNCE_MS = 20;
 
 export class Editor implements Component, Focusable {
 	private state: EditorState = {
@@ -332,6 +336,37 @@ export class Editor implements Component, Focusable {
 	setAutocompleteProvider(provider: AutocompleteProvider): void {
 		this.cancelAutocomplete();
 		this.autocompleteProvider = provider;
+	}
+
+	private isSymbolAutocompleteContext(textBeforeCursor: string): boolean {
+		return /(?:^|[ \t])(?:@(?:"[^"]*|[^\s]*)|#[^\s]*)$/.test(textBeforeCursor);
+	}
+
+	private getAutocompleteTriggerCharacters(): string[] {
+		const triggerCharacters = this.autocompleteProvider?.triggerCharacters;
+		if (!triggerCharacters) {
+			return [];
+		}
+
+		return [...new Set(triggerCharacters)].filter((character) => character.length === 1);
+	}
+
+	private isProviderTriggerContext(textBeforeCursor: string): boolean {
+		const triggerCharacters = this.getAutocompleteTriggerCharacters();
+		if (triggerCharacters.length === 0) {
+			return false;
+		}
+
+		const pattern = triggerCharacters.map((character) => escapeRegex(character)).join("|");
+		return new RegExp(`(?:^|[ \\t])(?:${pattern})[^\\s]*$`).test(textBeforeCursor);
+	}
+
+	private hasAutocompleteTriggerContext(textBeforeCursor: string): boolean {
+		return (
+			this.isInSlashCommandContext(textBeforeCursor) ||
+			this.isSymbolAutocompleteContext(textBeforeCursor) ||
+			this.isProviderTriggerContext(textBeforeCursor)
+		);
 	}
 
 	/**
@@ -1054,25 +1089,16 @@ export class Editor implements Component, Focusable {
 			if (char === "/" && this.isAtStartOfMessage()) {
 				this.tryTriggerAutocomplete();
 			}
-			// Auto-trigger for symbol-based completion like @ or # at token boundaries
-			else if (char === "@" || char === "#") {
+			// Auto-trigger for symbol- and provider-declared completion tokens at token boundaries.
+			else if (
+				/[a-zA-Z0-9.\-_]/.test(char) ||
+				char === "@" ||
+				char === "#" ||
+				this.getAutocompleteTriggerCharacters().includes(char)
+			) {
 				const currentLine = this.state.lines[this.state.cursorLine] || "";
 				const textBeforeCursor = currentLine.slice(0, this.state.cursorCol);
-				const charBeforeSymbol = textBeforeCursor[textBeforeCursor.length - 2];
-				if (textBeforeCursor.length === 1 || charBeforeSymbol === " " || charBeforeSymbol === "\t") {
-					this.tryTriggerAutocomplete();
-				}
-			}
-			// Also auto-trigger when typing letters in a slash command or symbol completion context
-			else if (/[a-zA-Z0-9.\-_]/.test(char)) {
-				const currentLine = this.state.lines[this.state.cursorLine] || "";
-				const textBeforeCursor = currentLine.slice(0, this.state.cursorCol);
-				// Check if we're in a slash command (with or without space for arguments)
-				if (this.isInSlashCommandContext(textBeforeCursor)) {
-					this.tryTriggerAutocomplete();
-				}
-				// Check if we're in a symbol-based completion context like @ or #
-				else if (textBeforeCursor.match(/(?:^|[\s])[@#][^\s]*$/)) {
+				if (this.hasAutocompleteTriggerContext(textBeforeCursor)) {
 					this.tryTriggerAutocomplete();
 				}
 			}
@@ -1244,15 +1270,9 @@ export class Editor implements Component, Focusable {
 		if (this.autocompleteState) {
 			this.updateAutocomplete();
 		} else {
-			// If autocomplete was cancelled (no matches), re-trigger if we're in a completable context
 			const currentLine = this.state.lines[this.state.cursorLine] || "";
 			const textBeforeCursor = currentLine.slice(0, this.state.cursorCol);
-			// Slash command context
-			if (this.isInSlashCommandContext(textBeforeCursor)) {
-				this.tryTriggerAutocomplete();
-			}
-			// Symbol-based completion context like @ or #
-			else if (textBeforeCursor.match(/(?:^|[\s])[@#][^\s]*$/)) {
+			if (this.hasAutocompleteTriggerContext(textBeforeCursor)) {
 				this.tryTriggerAutocomplete();
 			}
 		}
@@ -1611,12 +1631,7 @@ export class Editor implements Component, Focusable {
 		} else {
 			const currentLine = this.state.lines[this.state.cursorLine] || "";
 			const textBeforeCursor = currentLine.slice(0, this.state.cursorCol);
-			// Slash command context
-			if (this.isInSlashCommandContext(textBeforeCursor)) {
-				this.tryTriggerAutocomplete();
-			}
-			// Symbol-based completion context like @ or #
-			else if (textBeforeCursor.match(/(?:^|[\s])[@#][^\s]*$/)) {
+			if (this.hasAutocompleteTriggerContext(textBeforeCursor)) {
 				this.tryTriggerAutocomplete();
 			}
 		}
@@ -2176,8 +2191,9 @@ export class Editor implements Component, Focusable {
 
 		const currentLine = this.state.lines[this.state.cursorLine] || "";
 		const textBeforeCursor = currentLine.slice(0, this.state.cursorCol);
-		const isSymbolAutocompleteContext = /(?:^|[ \t])(?:@(?:"[^"]*|[^\s]*)|#[^\s]*)$/.test(textBeforeCursor);
-		return isSymbolAutocompleteContext ? ATTACHMENT_AUTOCOMPLETE_DEBOUNCE_MS : 0;
+		return this.isSymbolAutocompleteContext(textBeforeCursor) || this.isProviderTriggerContext(textBeforeCursor)
+			? NATURAL_AUTOCOMPLETE_DEBOUNCE_MS
+			: 0;
 	}
 
 	private async runAutocompleteRequest(
