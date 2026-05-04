@@ -239,8 +239,11 @@ export interface AutocompleteSuggestions {
 }
 
 export interface AutocompleteProvider {
-	/** Characters that should naturally trigger this provider at token boundaries. */
-	triggerCharacters?: string[];
+	/**
+	 * Optional characters that should start or continue a natural autocomplete token.
+	 * Editors use these to auto-open/update providers without hardcoded semantics.
+	 */
+	triggerCharacters?: readonly string[];
 
 	// Get autocomplete suggestions for current text/cursor position
 	// Returns null if no suggestions available
