@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Added `/exit` as a built-in alias for `/quit` to quit pi.
+
 ## [0.72.1] - 2026-05-02
 
 ## [0.72.0] - 2026-05-01
