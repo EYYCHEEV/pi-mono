@@ -93,6 +93,8 @@ function createIssueAutocompleteProvider(
 	getIssues: () => Promise<GitHubIssue[] | undefined>,
 ): AutocompleteProvider {
 	return {
+		triggerCharacters: [...(current.triggerCharacters ?? []), "#"],
+
 		async getSuggestions(lines, cursorLine, cursorCol, options): Promise<AutocompleteSuggestions | null> {
 			const currentLine = lines[cursorLine] ?? "";
 			const textBeforeCursor = currentLine.slice(0, cursorCol);
