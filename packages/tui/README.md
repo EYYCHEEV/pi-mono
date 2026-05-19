@@ -561,6 +561,7 @@ editor.setAutocompleteProvider(provider);
 - Press `Tab` for file path completion
 - Works with `~/`, `./`, `../`, and `@` prefix
 - Filters to attachable files for `@` prefix
+- Custom providers can set `triggerCharacters` to auto-open and update on their own token prefixes
 
 ## Key Detection
 
