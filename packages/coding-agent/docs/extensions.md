@@ -2287,7 +2287,8 @@ ctx.ui.pasteToEditor("pasted content");
 
 // Stack custom autocomplete behavior on top of the built-in provider
 ctx.ui.addAutocompleteProvider((current) => ({
-  triggerCharacters: ["#"],
+  triggerCharacters: [...(current.triggerCharacters ?? []), "#"],
+
   async getSuggestions(lines, line, col, options) {
     const beforeCursor = (lines[line] ?? "").slice(0, col);
     const match = beforeCursor.match(/(?:^|[ \t])#([^\s#]*)$/);
@@ -2348,7 +2349,8 @@ Typical pattern:
 ```typescript
 pi.on("session_start", (_event, ctx) => {
   ctx.ui.addAutocompleteProvider((current) => ({
-    triggerCharacters: ["#"],
+    triggerCharacters: [...(current.triggerCharacters ?? []), "#"],
+
     async getSuggestions(lines, cursorLine, cursorCol, options) {
       const line = lines[cursorLine] ?? "";
       const beforeCursor = line.slice(0, cursorCol);
