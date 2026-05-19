@@ -89,9 +89,14 @@ function generateImageModelsFile(models: ImagesModel<"openrouter-images">[]): st
 			api: ${JSON.stringify(model.api)},
 			provider: ${JSON.stringify(model.provider)},
 			baseUrl: ${JSON.stringify(model.baseUrl)},
-			input: ${JSON.stringify(model.input)},
-			output: ${JSON.stringify(model.output)},
-			cost: ${JSON.stringify(model.cost, null, 2).replace(/^/gm, "\t")}
+			input: [${model.input.map((input) => JSON.stringify(input)).join(", ")}],
+			output: [${model.output.map((output) => JSON.stringify(output)).join(", ")}],
+			cost: {
+				input: ${model.cost.input},
+				output: ${model.cost.output},
+				cacheRead: ${model.cost.cacheRead},
+				cacheWrite: ${model.cost.cacheWrite},
+			},
 		} satisfies ImagesModel<${JSON.stringify(model.api)}>`,
 				]),
 		),
@@ -102,7 +107,7 @@ function generateImageModelsFile(models: ImagesModel<"openrouter-images">[]): st
 			const modelEntries = Object.entries(providerModels)
 				.map(([id, serialized]) => `\t\t${JSON.stringify(id)}: ${serialized},`)
 				.join("\n");
-			return `\t${JSON.stringify(provider)}: {\n${modelEntries}\n\t},`;
+			return `\t${provider}: {\n${modelEntries}\n\t},`;
 		})
 		.join("\n");
 
