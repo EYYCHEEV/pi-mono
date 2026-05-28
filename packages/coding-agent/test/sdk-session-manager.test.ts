@@ -10,16 +10,23 @@ describe("createAgentSession session manager defaults", () => {
 	let tempDir: string;
 	let cwd: string;
 	let agentDir: string;
+	const originalSessionDir = process.env.PI_CODING_AGENT_SESSION_DIR;
 
 	beforeEach(() => {
 		tempDir = join(tmpdir(), `pi-sdk-session-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 		cwd = join(tempDir, "project");
 		agentDir = join(tempDir, "agent");
+		delete process.env.PI_CODING_AGENT_SESSION_DIR;
 		mkdirSync(cwd, { recursive: true });
 		mkdirSync(agentDir, { recursive: true });
 	});
 
 	afterEach(() => {
+		if (originalSessionDir === undefined) {
+			delete process.env.PI_CODING_AGENT_SESSION_DIR;
+		} else {
+			process.env.PI_CODING_AGENT_SESSION_DIR = originalSessionDir;
+		}
 		if (tempDir && existsSync(tempDir)) {
 			rmSync(tempDir, { recursive: true, force: true });
 		}
@@ -42,6 +49,24 @@ describe("createAgentSession session manager defaults", () => {
 
 		expect(sessionDir).toBe(expectedSessionDir);
 		expect(sessionFile?.startsWith(`${expectedSessionDir}/`)).toBe(true);
+
+		session.dispose();
+	});
+
+	it("uses PI_CODING_AGENT_SESSION_DIR for the default persisted session path", async () => {
+		const model = getModel("anthropic", "claude-sonnet-4-5");
+		expect(model).toBeTruthy();
+
+		const sessionDir = join(tempDir, "custom-sessions");
+		process.env.PI_CODING_AGENT_SESSION_DIR = sessionDir;
+		const { session } = await createAgentSession({
+			cwd,
+			agentDir,
+			model: model!,
+		});
+
+		expect(session.sessionManager.getSessionDir()).toBe(sessionDir);
+		expect(session.sessionManager.getSessionFile()?.startsWith(`${sessionDir}/`)).toBe(true);
 
 		session.dispose();
 	});
