@@ -17,7 +17,7 @@ import { readdir, stat } from "fs/promises";
 import { join, resolve } from "path";
 import { createInterface } from "readline";
 import { StringDecoder } from "string_decoder";
-import { getAgentDir as getDefaultAgentDir, getSessionsDir } from "../config.ts";
+import { ENV_SESSION_DIR, expandTildePath, getAgentDir as getDefaultAgentDir, getSessionsDir } from "../config.ts";
 import { normalizePath, resolvePath } from "../utils/paths.ts";
 import {
 	type BashExecutionMessage,
@@ -741,6 +741,18 @@ async function listSessionsFromDir(
 	}
 
 	return sessions;
+}
+
+function getSessionDiscoveryRoots(): string[] {
+	const envSessionDir = process.env[ENV_SESSION_DIR];
+	const roots = [envSessionDir ? expandTildePath(envSessionDir) : undefined, getSessionsDir()].filter(
+		(root): root is string => !!root,
+	);
+	return Array.from(new Set(roots.map((root) => resolve(root))));
+}
+
+function dedupeSessionFiles(files: string[]): string[] {
+	return Array.from(new Set(files.map((file) => resolve(file))));
 }
 
 /**
@@ -1522,38 +1534,43 @@ export class SessionManager {
 		const customSessionDir =
 			typeof sessionDirOrOnProgress === "string" ? normalizePath(sessionDirOrOnProgress) : undefined;
 		const progress = typeof sessionDirOrOnProgress === "function" ? sessionDirOrOnProgress : onProgress;
-		if (customSessionDir) {
-			const sessions = await listSessionsFromDir(customSessionDir, progress);
-			sessions.sort((a, b) => b.modified.getTime() - a.modified.getTime());
-			return sessions;
-		}
-
-		const sessionsDir = getSessionsDir();
+		const sessionsDirs = customSessionDir ? [customSessionDir] : getSessionDiscoveryRoots();
 
 		try {
-			if (!existsSync(sessionsDir)) {
-				return [];
-			}
-			const entries = await readdir(sessionsDir, { withFileTypes: true });
-			const dirs = entries.filter((e) => e.isDirectory()).map((e) => join(sessionsDir, e.name));
-
 			// Count total files first for accurate progress
 			let totalFiles = 0;
 			const dirFiles: string[][] = [];
-			for (const dir of dirs) {
+			for (const sessionsDir of sessionsDirs) {
 				try {
-					const files = (await readdir(dir)).filter((f) => f.endsWith(".jsonl"));
-					dirFiles.push(files.map((f) => join(dir, f)));
-					totalFiles += files.length;
+					if (!existsSync(sessionsDir)) {
+						continue;
+					}
+					const entries = await readdir(sessionsDir, { withFileTypes: true });
+					const rootFiles = entries
+						.filter((e) => e.isFile() && e.name.endsWith(".jsonl"))
+						.map((e) => join(sessionsDir, e.name));
+					const dirs = entries.filter((e) => e.isDirectory()).map((e) => join(sessionsDir, e.name));
+					dirFiles.push(rootFiles);
+					totalFiles += rootFiles.length;
+					for (const dir of dirs) {
+						try {
+							const files = (await readdir(dir)).filter((f) => f.endsWith(".jsonl"));
+							dirFiles.push(files.map((f) => join(dir, f)));
+							totalFiles += files.length;
+						} catch {
+							dirFiles.push([]);
+						}
+					}
 				} catch {
-					dirFiles.push([]);
+					// Skip unreadable roots
 				}
 			}
 
 			// Process all files with progress tracking
 			let loaded = 0;
 			const sessions: SessionInfo[] = [];
-			const allFiles = dirFiles.flat();
+			const allFiles = dedupeSessionFiles(dirFiles.flat());
+			totalFiles = allFiles.length;
 
 			const results = await buildSessionInfosWithConcurrency(allFiles, () => {
 				loaded++;
