@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BUILTIN_SLASH_COMMANDS } from "../src/core/slash-commands.js";
+import { BUILTIN_SLASH_COMMANDS } from "../src/core/slash-commands.ts";
 
 describe("BUILTIN_SLASH_COMMANDS", () => {
 	it("includes quit and exit as separate built-in commands", () => {
