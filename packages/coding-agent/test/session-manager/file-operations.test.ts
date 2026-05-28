@@ -316,3 +316,81 @@ describe("SessionManager.setSessionFile with corrupted files", () => {
 		expect(sm2.getHeader()?.type).toBe("session");
 	});
 });
+
+describe("SessionManager.listAll", () => {
+	let tempDir: string;
+	const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+	const originalSessionDir = process.env.PI_CODING_AGENT_SESSION_DIR;
+
+	beforeEach(() => {
+		tempDir = join(tmpdir(), `session-list-all-test-${Date.now()}`);
+		mkdirSync(tempDir, { recursive: true });
+		process.env.PI_CODING_AGENT_DIR = join(tempDir, "agent");
+		delete process.env.PI_CODING_AGENT_SESSION_DIR;
+		mkdirSync(join(process.env.PI_CODING_AGENT_DIR, "sessions"), { recursive: true });
+	});
+
+	afterEach(() => {
+		if (originalAgentDir === undefined) {
+			delete process.env.PI_CODING_AGENT_DIR;
+		} else {
+			process.env.PI_CODING_AGENT_DIR = originalAgentDir;
+		}
+		if (originalSessionDir === undefined) {
+			delete process.env.PI_CODING_AGENT_SESSION_DIR;
+		} else {
+			process.env.PI_CODING_AGENT_SESSION_DIR = originalSessionDir;
+		}
+		rmSync(tempDir, { recursive: true, force: true });
+	});
+
+	it("includes sessions stored directly under the configured sessions root", async () => {
+		const sessionsRoot = join(process.env.PI_CODING_AGENT_DIR!, "sessions");
+		const directFile = join(sessionsRoot, "direct.jsonl");
+		const nestedDir = join(sessionsRoot, "--project--");
+		const nestedFile = join(nestedDir, "nested.jsonl");
+		mkdirSync(nestedDir, { recursive: true });
+		writeFileSync(
+			directFile,
+			'{"type":"session","id":"direct","timestamp":"2025-01-01T00:00:00Z","cwd":"/tmp/direct"}\n',
+		);
+		writeFileSync(
+			nestedFile,
+			'{"type":"session","id":"nested","timestamp":"2025-01-01T00:00:00Z","cwd":"/tmp/nested"}\n',
+		);
+
+		const sessions = await SessionManager.listAll();
+		const ids = sessions.map((session) => session.id).sort();
+
+		expect(ids).toEqual(["direct", "nested"]);
+	});
+
+	it("includes sessions stored under PI_CODING_AGENT_SESSION_DIR", async () => {
+		const customSessionRoot = join(tempDir, "custom-sessions");
+		mkdirSync(customSessionRoot, { recursive: true });
+		process.env.PI_CODING_AGENT_SESSION_DIR = customSessionRoot;
+		writeFileSync(
+			join(customSessionRoot, "env-session.jsonl"),
+			'{"type":"session","id":"env-session","timestamp":"2025-01-01T00:00:00Z","cwd":"/tmp/env"}\n',
+		);
+
+		const sessions = await SessionManager.listAll();
+
+		expect(sessions.map((session) => session.id)).toEqual(["env-session"]);
+	});
+
+	it("dedupes sessions when PI_CODING_AGENT_SESSION_DIR is inside the configured sessions root", async () => {
+		const sessionsRoot = join(process.env.PI_CODING_AGENT_DIR!, "sessions");
+		const nestedSessionRoot = join(sessionsRoot, "--project--");
+		mkdirSync(nestedSessionRoot, { recursive: true });
+		process.env.PI_CODING_AGENT_SESSION_DIR = nestedSessionRoot;
+		writeFileSync(
+			join(nestedSessionRoot, "nested-env-session.jsonl"),
+			'{"type":"session","id":"nested-env","timestamp":"2025-01-01T00:00:00Z","cwd":"/tmp/nested-env"}\n',
+		);
+
+		const sessions = await SessionManager.listAll();
+
+		expect(sessions.map((session) => session.id)).toEqual(["nested-env"]);
+	});
+});
