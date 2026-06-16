@@ -135,44 +135,6 @@ function getDefaultSdkSessionDir(cwd: string, agentDir: string, settingsManager:
 	}
 	return settingsManager.getSessionDir() ?? getDefaultSessionDir(cwd, agentDir);
 }
-
-function getAttributionHeaders(
-	model: Model<any>,
-	settingsManager: SettingsManager,
-	sessionId?: string,
-): Record<string, string> | undefined {
-	if (
-		sessionId &&
-		(model.provider === "opencode" || model.provider === "opencode-go" || model.baseUrl.includes("opencode.ai"))
-	) {
-		return { "x-opencode-session": sessionId, "x-opencode-client": "pi" };
-	}
-
-	if (!isInstallTelemetryEnabled(settingsManager)) {
-		return undefined;
-	}
-
-	if (model.provider === "openrouter" || model.baseUrl.includes("openrouter.ai")) {
-		return {
-			"HTTP-Referer": "https://pi.dev",
-			"X-OpenRouter-Title": "pi",
-			"X-OpenRouter-Categories": "cli-agent",
-		};
-	}
-
-	if (
-		model.provider === "cloudflare-workers-ai" ||
-		model.provider === "cloudflare-ai-gateway" ||
-		model.baseUrl.includes("api.cloudflare.com") ||
-		model.baseUrl.includes("gateway.ai.cloudflare.com")
-	) {
-		return {
-			"User-Agent": "pi-coding-agent",
-		};
-	}
-
-	return undefined;
-}
 /**
  * Create an AgentSession with the specified options.
  *
