@@ -3885,7 +3885,7 @@ export const MODELS = {
 			cost: {
 				input: 0.14,
 				output: 0.28,
-				cacheRead: 0.03,
+				cacheRead: 0.028,
 				cacheWrite: 0,
 			},
 			contextWindow: 1000000,
@@ -3927,6 +3927,24 @@ export const MODELS = {
 			contextWindow: 202800,
 			maxTokens: 131072,
 		} satisfies Model<"anthropic-messages">,
+		"accounts/fireworks/models/glm-5p2": {
+			id: "accounts/fireworks/models/glm-5p2",
+			name: "GLM 5.2",
+			api: "anthropic-messages",
+			provider: "fireworks",
+			baseUrl: "https://api.fireworks.ai/inference",
+			compat: {"sendSessionAffinityHeaders":true,"supportsEagerToolInputStreaming":false,"supportsCacheControlOnTools":false,"supportsLongCacheRetention":false},
+			reasoning: true,
+			input: ["text"],
+			cost: {
+				input: 1.4,
+				output: 4.4,
+				cacheRead: 0.26,
+				cacheWrite: 0,
+			},
+			contextWindow: 1048576,
+			maxTokens: 131072,
+		} satisfies Model<"anthropic-messages">,
 		"accounts/fireworks/models/gpt-oss-120b": {
 			id: "accounts/fireworks/models/gpt-oss-120b",
 			name: "GPT OSS 120B",
@@ -3939,7 +3957,7 @@ export const MODELS = {
 			cost: {
 				input: 0.15,
 				output: 0.6,
-				cacheRead: 0.01,
+				cacheRead: 0.015,
 				cacheWrite: 0,
 			},
 			contextWindow: 131072,
@@ -4117,7 +4135,7 @@ export const MODELS = {
 			reasoning: true,
 			input: ["text", "image"],
 			cost: {
-				input: 2,
+				input: 1.9,
 				output: 8,
 				cacheRead: 0.38,
 				cacheWrite: 0,
@@ -9499,13 +9517,13 @@ export const MODELS = {
 			thinkingLevelMap: {"minimal":null,"low":null,"medium":null,"high":"high","xhigh":"xhigh"},
 			input: ["text"],
 			cost: {
-				input: 0.098,
-				output: 0.196,
+				input: 0.09,
+				output: 0.18,
 				cacheRead: 0.02,
 				cacheWrite: 0,
 			},
 			contextWindow: 1048576,
-			maxTokens: 4096,
+			maxTokens: 65536,
 		} satisfies Model<"openai-completions">,
 		"deepseek/deepseek-v4-pro": {
 			id: "deepseek/deepseek-v4-pro",
@@ -10677,8 +10695,8 @@ export const MODELS = {
 			input: ["text"],
 			cost: {
 				input: 0.5,
-				output: 2.5,
-				cacheRead: 0.15,
+				output: 2.2,
+				cacheRead: 0.1,
 				cacheWrite: 0,
 			},
 			contextWindow: 1000000,
@@ -15107,7 +15125,7 @@ export const MODELS = {
 				cacheWrite: 0,
 			},
 			contextWindow: 262144,
-			maxTokens: 4096,
+			maxTokens: 262144,
 		} satisfies Model<"anthropic-messages">,
 		"nvidia/nemotron-3-super-120b-a12b": {
 			id: "nvidia/nemotron-3-super-120b-a12b",
