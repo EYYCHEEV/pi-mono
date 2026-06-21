@@ -318,6 +318,23 @@ describe("Editor component", () => {
 	});
 
 	describe("Backslash+Enter newline workaround", () => {
+		it("inserts newline for raw linefeed input", () => {
+			const editor = new Editor(createTestTUI(), defaultEditorTheme);
+			let submitted = false;
+
+			editor.onSubmit = () => {
+				submitted = true;
+			};
+
+			editor.handleInput("hello");
+			editor.handleInput("\n");
+			editor.handleInput("world");
+
+			assert.strictEqual(editor.getText(), "hello\nworld");
+			assert.strictEqual(submitted, false);
+			assert.deepStrictEqual(editor.getCursor(), { line: 1, col: 5 });
+		});
+
 		it("inserts backslash immediately (no buffering)", () => {
 			const editor = new Editor(createTestTUI(), defaultEditorTheme);
 

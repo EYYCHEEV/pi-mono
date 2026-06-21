@@ -6,6 +6,10 @@
 
 - Added `/exit` as a built-in alias for `/quit` to quit pi.
 
+### Changed
+
+- Documented `Ctrl+J` as a default multi-line input shortcut.
+
 ## [0.79.9] - 2026-06-20
 
 ### New Features

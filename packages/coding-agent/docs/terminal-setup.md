@@ -30,11 +30,13 @@ That mapping sends a raw linefeed byte. Inside pi, that is indistinguishable fro
 
 If Claude Code 2.x or newer is the only reason you added that mapping, you can remove it, unless you want to use Claude Code in tmux, where it still requires that Ghostty mapping.
 
-If you want `Shift+Enter` to keep working in tmux via that remap, add `ctrl+j` to your pi `newLine` keybinding in `~/.pi/agent/keybindings.json`:
+Pi binds both `shift+enter` and `ctrl+j` to `tui.input.newLine` by default, so that raw linefeed remap now inserts a new line without extra configuration.
+
+If you customize `tui.input.newLine` in `~/.pi/agent/keybindings.json`, keep `ctrl+j` in the list when you rely on the Ghostty raw linefeed remap:
 
 ```json
 {
-  "newLine": ["shift+enter", "ctrl+j"]
+  "tui.input.newLine": ["shift+enter", "ctrl+j"]
 }
 ```
 

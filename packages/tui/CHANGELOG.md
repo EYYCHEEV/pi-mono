@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- Added `Ctrl+J` as a default `tui.input.newLine` keybinding for terminals that send a raw linefeed.
+
 ## [0.79.9] - 2026-06-20
 
 ### Fixed

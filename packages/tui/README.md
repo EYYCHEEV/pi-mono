@@ -326,7 +326,7 @@ editor.getPaddingX();  // Get current padding
 
 **Key Bindings:**
 - `Enter` - Submit
-- `Shift+Enter`, `Ctrl+Enter`, or `Alt+Enter` - New line (terminal-dependent, Alt+Enter most reliable)
+- `Shift+Enter`, `Ctrl+J`, `Ctrl+Enter`, or `Alt+Enter` - New line (terminal-dependent, `Ctrl+J` is reliable when terminals send a raw linefeed)
 - `Tab` - Autocomplete
 - `Ctrl+K` - Delete to end of line
 - `Ctrl+U` - Delete to start of line
