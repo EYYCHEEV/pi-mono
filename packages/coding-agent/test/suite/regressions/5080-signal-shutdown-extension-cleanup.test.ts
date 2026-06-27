@@ -3,7 +3,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import chalk from "chalk";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { APP_NAME } from "../../../src/config.ts";
 import type { SessionManager } from "../../../src/core/session-manager.ts";
 import { InteractiveMode } from "../../../src/modes/interactive/interactive-mode.ts";
 
@@ -33,6 +32,8 @@ type InteractiveModePrototypeWithShutdown = {
 const interactiveModePrototype = InteractiveMode.prototype as unknown;
 const tempDirs: string[] = [];
 const originalStdoutIsTTY = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
+const RAW_PI_SESSION_COMMAND = /(^|\s)pi\s+--session\b/;
+const SESSION_DIR_ARG = /(^|\s)--session-dir(?:\s|=)/;
 
 class ProcessExitError extends Error {}
 
@@ -147,8 +148,12 @@ describe("InteractiveMode.shutdown ordering (#5080)", () => {
 
 		expect(order).toEqual(["drainInput", "stop", "dispose"]);
 		expect(stdoutWrite).toHaveBeenCalledWith(
-			`${chalk.dim("To resume this session:")} ${APP_NAME} --session test-session\n`,
+			`${chalk.dim("To continue this session, run")} stronkpi --session test-session\n`,
 		);
+		const output = stdoutWrite.mock.calls.map((call) => String(call[0])).join("");
+		expect(output).not.toContain("To resume this session:");
+		expect(output).not.toMatch(RAW_PI_SESSION_COMMAND);
+		expect(output).not.toMatch(SESSION_DIR_ARG);
 	});
 
 	test("signal-triggered shutdown does not print a resume hint", async () => {
@@ -166,6 +171,7 @@ describe("InteractiveMode.shutdown ordering (#5080)", () => {
 
 		for (const call of stdoutWrite.mock.calls) {
 			expect(call[0]).not.toContain("To resume this session:");
+			expect(call[0]).not.toContain("To continue this session, run");
 		}
 	});
 

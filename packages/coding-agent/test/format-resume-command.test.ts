@@ -2,12 +2,13 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { APP_NAME } from "../src/config.ts";
 import type { SessionManager } from "../src/core/session-manager.ts";
 import { formatResumeCommand } from "../src/modes/interactive/interactive-mode.ts";
 
 const tempDirs: string[] = [];
 const originalStdoutIsTTY = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
+const RAW_PI_SESSION_COMMAND = /(^|\s)pi\s+--session\b/;
+const SESSION_DIR_ARG = /(^|\s)--session-dir(?:\s|=)/;
 
 afterEach(() => {
 	if (originalStdoutIsTTY) {
@@ -49,16 +50,22 @@ function createSessionManager(options: {
 	} as unknown as SessionManager;
 }
 
+function expectStronkPiResumeCommand(command: string | undefined): void {
+	expect(command).toBe("stronkpi --session test-session");
+	expect(command).not.toMatch(RAW_PI_SESSION_COMMAND);
+	expect(command).not.toMatch(SESSION_DIR_ARG);
+}
+
 describe("formatResumeCommand", () => {
 	it("returns a session resume command for default session dirs", () => {
 		setStdoutIsTTY(true);
 		const sessionFile = createTempFile();
 		const sessionManager = createSessionManager({ sessionFile, sessionId: "test-session" });
 
-		expect(formatResumeCommand(sessionManager)).toBe(`${APP_NAME} --session test-session`);
+		expectStronkPiResumeCommand(formatResumeCommand(sessionManager));
 	});
 
-	it("includes unquoted safe session dirs for non-default session dirs", () => {
+	it("does not expose unquoted safe session dirs for non-default session dirs", () => {
 		setStdoutIsTTY(true);
 		const sessionFile = createTempFile();
 		const sessionManager = createSessionManager({
@@ -68,12 +75,10 @@ describe("formatResumeCommand", () => {
 			usesDefaultSessionDir: false,
 		});
 
-		expect(formatResumeCommand(sessionManager)).toBe(
-			`${APP_NAME} --session-dir /tmp/custom-pi-sessions --session test-session`,
-		);
+		expectStronkPiResumeCommand(formatResumeCommand(sessionManager));
 	});
 
-	it("quotes session dirs containing spaces", () => {
+	it("does not expose session dirs containing spaces", () => {
 		setStdoutIsTTY(true);
 		const sessionFile = createTempFile();
 		const sessionManager = createSessionManager({
@@ -83,12 +88,10 @@ describe("formatResumeCommand", () => {
 			usesDefaultSessionDir: false,
 		});
 
-		expect(formatResumeCommand(sessionManager)).toBe(
-			`${APP_NAME} --session-dir '/tmp/custom pi sessions' --session test-session`,
-		);
+		expectStronkPiResumeCommand(formatResumeCommand(sessionManager));
 	});
 
-	it("quotes session dirs containing single quotes", () => {
+	it("does not expose session dirs containing single quotes", () => {
 		setStdoutIsTTY(true);
 		const sessionFile = createTempFile();
 		const sessionManager = createSessionManager({
@@ -98,9 +101,7 @@ describe("formatResumeCommand", () => {
 			usesDefaultSessionDir: false,
 		});
 
-		expect(formatResumeCommand(sessionManager)).toBe(
-			`${APP_NAME} --session-dir '/tmp/custom pi'\\''s sessions' --session test-session`,
-		);
+		expectStronkPiResumeCommand(formatResumeCommand(sessionManager));
 	});
 
 	it("returns undefined when stdout is not a TTY", () => {
