@@ -587,6 +587,8 @@ export interface SessionShutdownEvent {
 	reason: "quit" | "reload" | "new" | "resume" | "fork";
 	/** Destination session file when shutting down due to session replacement. */
 	targetSessionFile?: string;
+	/** Host-owned shutdown UX should suppress extension-provided resume hints. */
+	suppressSessionResumeHint?: boolean;
 }
 
 /** Preparation data for tree navigation */

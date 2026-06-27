@@ -3347,7 +3347,7 @@ export class InteractiveMode {
 			// terminal. If the terminal is gone, the restore writes below emit EIO,
 			// which the stdout/stderr error handler turns into emergencyTerminalExit;
 			// the render loop is already idle, so this cannot hot-spin (see #4144).
-			await this.runtimeHost.dispose();
+			await this.runtimeHost.dispose({ suppressSessionResumeHint: true });
 			this.themeController.disableAutoSync();
 			await this.ui.terminal.drainInput(1000);
 			this.stop();
@@ -3363,7 +3363,7 @@ export class InteractiveMode {
 		await this.ui.terminal.drainInput(1000);
 
 		this.stop();
-		await this.runtimeHost.dispose();
+		await this.runtimeHost.dispose({ suppressSessionResumeHint: true });
 
 		const resumeCommand = formatResumeCommand(this.sessionManager);
 		if (resumeCommand) {

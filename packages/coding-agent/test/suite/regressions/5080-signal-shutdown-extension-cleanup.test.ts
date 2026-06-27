@@ -18,7 +18,7 @@ import { InteractiveMode } from "../../../src/modes/interactive/interactive-mode
 type ShutdownThis = {
 	isShuttingDown: boolean;
 	unregisterSignalHandlers: () => void;
-	runtimeHost: { dispose: () => Promise<void> };
+	runtimeHost: { dispose: (options?: { suppressSessionResumeHint?: boolean }) => Promise<void> };
 	ui: { terminal: { drainInput: (ms: number) => Promise<void> } };
 	themeController: { disableAutoSync: () => void };
 	stop: () => void;
@@ -67,13 +67,20 @@ function restoreStdoutIsTTY(): void {
 	}
 }
 
-function createContext(order: string[], sessionManager = createSessionManager()): ShutdownThis {
+function createContext(
+	order: string[],
+	sessionManager = createSessionManager(),
+	options: { pluginWouldPrintResumeHint?: boolean } = {},
+): ShutdownThis {
 	return {
 		isShuttingDown: false,
 		unregisterSignalHandlers: vi.fn(),
 		runtimeHost: {
-			dispose: vi.fn(async () => {
+			dispose: vi.fn(async (disposeOptions?: { suppressSessionResumeHint?: boolean }) => {
 				order.push("dispose");
+				if (options.pluginWouldPrintResumeHint && !disposeOptions?.suppressSessionResumeHint) {
+					process.stderr.write("To continue this session, run stronkpi --session test-session\n");
+				}
 			}),
 		},
 		ui: {
@@ -119,6 +126,7 @@ describe("InteractiveMode.shutdown ordering (#5080)", () => {
 
 		expect(order).toEqual(["dispose", "drainInput", "stop"]);
 		expect(context.isShuttingDown).toBe(true);
+		expect(context.runtimeHost.dispose).toHaveBeenCalledWith({ suppressSessionResumeHint: true });
 	});
 
 	test("interactive quit stops the TUI before emitting session_shutdown", async () => {
@@ -133,16 +141,21 @@ describe("InteractiveMode.shutdown ordering (#5080)", () => {
 		expect(order).toEqual(["drainInput", "stop", "dispose"]);
 	});
 
-	test("interactive quit prints a resume hint for persisted sessions", async () => {
+	test("interactive quit prints exactly one resume hint for persisted sessions", async () => {
 		vi.spyOn(process, "exit").mockImplementation((() => {
 			throw new ProcessExitError();
 		}) as typeof process.exit);
 		const stdoutWrite = vi
 			.spyOn(process.stdout, "write")
 			.mockImplementation((() => true) as typeof process.stdout.write);
+		const stderrWrite = vi
+			.spyOn(process.stderr, "write")
+			.mockImplementation((() => true) as typeof process.stderr.write);
 		setStdoutIsTTY(true);
 		const order: string[] = [];
-		const context = createContext(order, createSessionManager({ sessionFile: createTempFile() }));
+		const context = createContext(order, createSessionManager({ sessionFile: createTempFile() }), {
+			pluginWouldPrintResumeHint: true,
+		});
 
 		await callShutdown(context);
 
@@ -150,7 +163,12 @@ describe("InteractiveMode.shutdown ordering (#5080)", () => {
 		expect(stdoutWrite).toHaveBeenCalledWith(
 			`${chalk.dim("To continue this session, run")} stronkpi --session test-session\n`,
 		);
-		const output = stdoutWrite.mock.calls.map((call) => String(call[0])).join("");
+		expect(context.runtimeHost.dispose).toHaveBeenCalledWith({ suppressSessionResumeHint: true });
+		const output =
+			stdoutWrite.mock.calls.map((call) => String(call[0])).join("") +
+			stderrWrite.mock.calls.map((call) => String(call[0])).join("");
+		const resumeHints = output.match(/To continue this session, run stronkpi --session test-session/g) ?? [];
+		expect(resumeHints).toHaveLength(1);
 		expect(output).not.toContain("To resume this session:");
 		expect(output).not.toMatch(RAW_PI_SESSION_COMMAND);
 		expect(output).not.toMatch(SESSION_DIR_ARG);
@@ -163,16 +181,23 @@ describe("InteractiveMode.shutdown ordering (#5080)", () => {
 		const stdoutWrite = vi
 			.spyOn(process.stdout, "write")
 			.mockImplementation((() => true) as typeof process.stdout.write);
+		const stderrWrite = vi
+			.spyOn(process.stderr, "write")
+			.mockImplementation((() => true) as typeof process.stderr.write);
 		setStdoutIsTTY(true);
 		const order: string[] = [];
-		const context = createContext(order, createSessionManager({ sessionFile: createTempFile() }));
+		const context = createContext(order, createSessionManager({ sessionFile: createTempFile() }), {
+			pluginWouldPrintResumeHint: true,
+		});
 
 		await callShutdown(context, { fromSignal: true });
 
-		for (const call of stdoutWrite.mock.calls) {
-			expect(call[0]).not.toContain("To resume this session:");
-			expect(call[0]).not.toContain("To continue this session, run");
-		}
+		expect(context.runtimeHost.dispose).toHaveBeenCalledWith({ suppressSessionResumeHint: true });
+		const output =
+			stdoutWrite.mock.calls.map((call) => String(call[0])).join("") +
+			stderrWrite.mock.calls.map((call) => String(call[0])).join("");
+		expect(output).not.toContain("To resume this session:");
+		expect(output).not.toContain("To continue this session, run");
 	});
 
 	test("re-entrant shutdown is a no-op", async () => {

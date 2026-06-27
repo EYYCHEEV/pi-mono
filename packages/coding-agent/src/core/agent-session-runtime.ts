@@ -40,6 +40,10 @@ export type CreateAgentSessionRuntimeFactory = (options: {
 	projectTrustContext?: ProjectTrustContext;
 }) => Promise<CreateAgentSessionRuntimeResult>;
 
+export interface AgentSessionRuntimeDisposeOptions {
+	suppressSessionResumeHint?: boolean;
+}
+
 /**
  * Thrown when /import references a JSONL file path that does not exist.
  */
@@ -387,10 +391,11 @@ export class AgentSessionRuntime {
 		return { cancelled: false };
 	}
 
-	async dispose(): Promise<void> {
+	async dispose(options?: AgentSessionRuntimeDisposeOptions): Promise<void> {
 		await emitSessionShutdownEvent(this.session.extensionRunner, {
 			type: "session_shutdown",
 			reason: "quit",
+			...(options?.suppressSessionResumeHint ? { suppressSessionResumeHint: true } : {}),
 		});
 		this.beforeSessionInvalidate?.();
 		this.session.dispose();
